@@ -883,3 +883,13 @@ UNION
 SELECT *
 FROM SinhVien
 WHERE MONTH(ngaySinh) BETWEEN 1 AND 6;
+
+
+
+--Từ view đã tạo hay thực hiện những câu truy vấn sau 
+--1 Hiển thị thông tin của tất cả sinh viên khóa 23 có giới tính là nam(M) 
+SELECT * FROM dbo.v_sinhVienK23
+WHERE gioiTinh ='M'
+-- 2 Hiển thị thông tin của tất cả sinh viên khóa 23 có giới tính là nữ và thuộc lớp sinh hoạt 01
+
+-- 
