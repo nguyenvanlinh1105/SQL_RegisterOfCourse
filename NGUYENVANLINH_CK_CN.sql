@@ -674,6 +674,49 @@ JOIN ChuongTrinhDaoTao_HocPhan CTD_HP ON HP.maHP = CTD_HP.maHP
 JOIN ChuongTrinhDaoTao CTD ON CTD_HP.maChuongTrinhDaoTao = CTD.maChuongTrinhDaoTao
 WHERE CTD.tenChuongTrinhDaoTao = N'Chương Trình Đào Tạo 1' AND HP.tenHP = N'Học Phần 1';
 
+-- TRUY VẤN Từ view đã tạo hay thực hiện những câu truy vấn sau 
+--1 Hiển thị thông tin của tất cả sinh viên khóa 23 có giới tính là nam(M) 
+SELECT * FROM dbo.v_sinhVienK23
+WHERE gioiTinh ='M'
+-- 2 Hiển thị thông tin của tất cả sinh viên khóa 23 có giới tính là nữ và có mã lớp sinh hoạt là 'LSH001'
+SELECT * FROM dbo.v_sinhVienK23
+WHERE gioiTinh='F' and maLSH ='LSH001'
+-- 3 Hiển thị tất cả thông tin của lớp học phần vào Thứ 2 có tiết 3-4;
+SELECT * FROM dbo.LopHocPhan_T2_Tiet34
+
+-- 4 Hiển thị Sinh viên nũ của khoa công nghệ thông tin 
+SELECT * FROM dbo.SinhVien_Nu_KhoaCNTT
+--5 Hiển thị những sinh viên khóa 23 và đăng kí học phần kì 123
+
+SELECT v.*
+FROM v_sinhVienK23 v
+JOIN DangKiTinChi DK ON v.maSV = DK.maSV
+WHERE namBD = '123';
+
+
+-- 5 Hiển thị những học phần của bảng SinhVien_HP1_CTD1
+SELECT * FROM dbo.SinhVien_HocHP1_CTD1
+
+--7Danh sách sinh viên của các lớp có nhiều hơn 5 sinh viên:
+SELECT * FROM [dbo].[SoLuongSinhVien_Khoa] 
+WHERE SoLuongSV > 3;
+-- 8 Hiển thị những  sinh viên đã đang kí học phần của lớp SH có maLSH= 'LSH001' và  có giới tính nữ
+
+SELECT * FROM dbo.v_sinhVien_K_ĐKHP
+WHERE maLSH ='LSH001' and gioiTinh ='M'
+
+-- 9 Danh sách sinh viên nữ thuộc Khoa Công nghệ thông tin và không tham gia đăng ký học phần kỳ 123:
+SELECT s.* FROM [dbo].[SinhVien_Nu_KhoaCNTT] as s
+JOIN [dbo].[v_sinhVien_K_ĐKHP] as sv ON s.maSV= sv.maSV
+-- 10 Danh sách sinh viên của các lớp khóa 23 không tham gia tham gia đăng ký học phần kỳ 123:
+SELECT l.maLSH,l.tenLSH
+FROM [dbo].[v_sinhVienK23]  v_sv
+JOIN dbo.LopSH l ON v_sv.maLSH = l.maLSH
+and l.maLSH NOT IN (
+        SELECT DISTINCT maLSH
+        FROM v_sinhVien_K_ĐKHP
+    );
+	-- Câu lệnh IF_ELSE CASE
 --Kiểm tra xem có sinh viên nào có giới tính nam hay 
 --không nếu có thì  in ra ‘Co sinh vien nam trong danh sách’ ngược lại in ra ‘Khong co sinh vien nam trong danh sach’.
 
@@ -886,10 +929,7 @@ WHERE MONTH(ngaySinh) BETWEEN 1 AND 6;
 
 
 
---Từ view đã tạo hay thực hiện những câu truy vấn sau 
---1 Hiển thị thông tin của tất cả sinh viên khóa 23 có giới tính là nam(M) 
-SELECT * FROM dbo.v_sinhVienK23
-WHERE gioiTinh ='M'
--- 2 Hiển thị thông tin của tất cả sinh viên khóa 23 có giới tính là nữ và thuộc lớp sinh hoạt 01
 
--- 
+
+
+
