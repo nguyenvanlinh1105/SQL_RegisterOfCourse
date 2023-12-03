@@ -917,7 +917,7 @@ SELECT *
 FROM SinhVien
 WHERE SDT LIKE '09%';
 
-
+-- Sử dụng câu lệnh UNION để hiển thị những sinh viên nam và có tháng sinh của ngày sinh từ tháng 1 đến tháng 6 ;
 
 SELECT *
 FROM SinhVien
@@ -929,7 +929,355 @@ WHERE MONTH(ngaySinh) BETWEEN 1 AND 6;
 
 
 
+--Liệt kê tên, loại (sinh viên/giáo viên), và ngày đăng ký của tất cả các đăng ký môn học:
+SELECT maSV AS Ma, 'SinhVien' AS Loai, thoiGianDK AS NgayDangKy
+FROM DangKiTinChi
+UNION
+SELECT maGV AS Ma, 'GiaoVien' AS Loai, NULL AS NgayDangKy
+FROM GiaoVien;
 
+--Sử dụng câu lệnh UNION để thực hiện Liệt kê tất cả các lớp học phần và thời gian học tương ứng:
+
+SELECT maLHP AS Ma, 'LopHocPhan' AS Loai, NULL AS ThoiGianHoc
+FROM LopHocPhan
+UNION
+SELECT tg.maThoiGian AS Ma, 'ThoiGianHoc' AS Loai,
+	tg.Thu + ' ' + CAST(tietBD AS NVARCHAR) + '-' + CAST(tietKT AS NVARCHAR) AS ThoiGianHoc
+FROM ThoiGian_PhongHoc AS tg_ph
+JOIN ThoiGian AS tg ON tg.maThoiGian = tg_ph.maThoiGian;
+
+
+
+-- Truy vấn có sử dụng UNION liệt kê tất cả các môn học và số lượng sinh viên đã đăng ký
+SELECT tenHP AS MonHoc, COUNT(DISTINCT maDKCT) AS SoLuongSinhVien
+FROM HocPhan
+LEFT JOIN LopHocPhan ON HocPhan.maHP = LopHocPhan.maHP
+LEFT JOIN DangKiChiTiet ON LopHocPhan.maLHP = DangKiChiTiet.maLHP
+GROUP BY tenHP
+ORDER BY SoLuongSinhVien DESC;
+
+
+--FUNCTION 
+-- Câu 1:lấy Tên Khoa theo Mã Khoa:
+CREATE FUNCTION dbo.GetTenKhoa (
+    @maKhoa CHAR(10)
+)
+RETURNS NVARCHAR(50)
+AS
+BEGIN
+    DECLARE @tenKhoa NVARCHAR(50)
+    SELECT @tenKhoa = tenKhoa FROM Khoa WHERE maKhoa = @maKhoa
+    RETURN @tenKhoa
+END;
+-- check
+SELECT k.maKhoa , dbo.getTenKhoa(k.maKhoa) as tenKhoa 
+FROM dbo.Khoa AS k
+
+
+-- Câu 2 tạo hàm lấy lớp sinh hoạt của sinh viên 
+CREATE FUNCTION dbo.GetTenLopSH (
+    @maSV CHAR(15)
+)
+RETURNS NVARCHAR(50)
+AS
+BEGIN
+    DECLARE @tenLopSH NVARCHAR(50)
+    SELECT @tenLopSH = l.tenLSH
+    FROM SinhVien AS s
+    INNER JOIN LopSH AS l ON s.maLSH = l.maLSH
+    WHERE s.maSV = @maSV
+    RETURN @tenLopSH
+END;
+-- check 
+select s.*, dbo.GetTenLopSH(s.maSV) as tenLSH
+from dbo.sinhvien as s
+
+
+-- Câu 3: Tạo hàm lấy tên Giáo viên dựa vào mã Giáo viên 
+CREATE FUNCTION dbo.GetTenGiaoVien (
+    @maGV CHAR(15)
+)
+RETURNS NVARCHAR(255)
+AS
+BEGIN
+    DECLARE @tenGV NVARCHAR(255)
+    SELECT @tenGV = tenGV FROM GiaoVien WHERE maGV = @maGV
+    RETURN @tenGV
+END;
+
+-- Câu 4: Tạo hàm lấy số lượng học phần mà sinh viên đã đăng kí 
+CREATE FUNCTION dbo.GetSoLuongDangKy (
+    @maSV CHAR(15)
+)
+RETURNS INT
+AS
+BEGIN
+    DECLARE @soLuong INT
+    SELECT @soLuong = COUNT(*) FROM DangKiTinChi WHERE maSV = @maSV
+    RETURN @soLuong
+END;
+select s.*, dbo.GetSoLuongDangKy(s.maSV) as SoLuongDK
+from dbo.SinhVien s
+
+
+-- Câu 5: Lấy tên học phần theo mã học phần 
+CREATE FUNCTION dbo.GetTenHocPhan (
+    @maHP CHAR(20)
+)
+RETURNS NVARCHAR(255)
+AS
+BEGIN
+    DECLARE @tenHP NVARCHAR(255)
+    SELECT @tenHP = tenHP FROM HocPhan WHERE maHP = @maHP
+    RETURN @tenHP
+END;
+
+-- Câu 6: Lấy tên thời gian học theo mã thời gian được truyền vào
+CREATE FUNCTION dbo.GetTenThoiGianHoc (
+    @maThoiGian CHAR(10)
+)
+RETURNS NVARCHAR(50)
+AS
+BEGIN
+    DECLARE @tenThoiGian NVARCHAR(50)
+    SELECT @tenThoiGian = Thu + ' ' + CAST(tietBD AS NVARCHAR) + '-' + CAST(tietKT AS NVARCHAR)
+    FROM ThoiGian
+    WHERE maThoiGian = @maThoiGian
+    RETURN @tenThoiGian
+END;
+
+select maThoiGian, dbo.GetTenThoiGianHoc(maThoiGian) as  ThongTin
+from dbo.ThoiGian
+--Lấy Tên Phòng Học theo Mã Phòng:
+
+CREATE FUNCTION dbo.GetTenPhongHoc (
+    @maPhong CHAR(10)
+)
+RETURNS NVARCHAR(20)
+AS
+BEGIN
+    DECLARE @tenPhong NVARCHAR(20)
+    SELECT @tenPhong = tenPhong FROM Phong WHERE maPhong = @maPhong
+    RETURN @tenPhong
+END;
+
+
+-- Câu 9 : Lấy Số Lượng Đăng Ký Chi Tiết trong Một Lớp Học Phần:
+CREATE FUNCTION dbo.GetSoLuongDangKyChiTiet (
+    @maLHP CHAR(15)
+)
+RETURNS INT
+AS
+BEGIN
+    DECLARE @soLuong INT
+    SELECT @soLuong = COUNT(*) FROM DangKiChiTiet WHERE maLHP = @maLHP
+    RETURN @soLuong
+END;
+
+SELECT *, dbo.GetSoLuongDangKyChiTiet(maLHP) as soLuongĐK
+FROM dbo.LopHocPhan
+-- Hàm check điều kiện đủ tuổi của một sinh viên 
+CREATE FUNCTION dbo.CheckAgeCondition (
+    @ngaySinh DATETIME
+)
+RETURNS NVARCHAR(50)
+AS
+BEGIN
+    DECLARE @tuoi INT
+    SET @tuoi = DATEDIFF(YEAR, @ngaySinh, GETDATE())
+
+    DECLARE @ketQua NVARCHAR(50)
+
+    IF @tuoi >= 18
+        SET @ketQua = 'Đủ 18 tuổi'
+    ELSE
+        SET @ketQua = 'Chưa đủ 18 tuổi'
+
+    RETURN @ketQua
+END;
+
+-- Kiểm Tra Số Lượng Đăng Ký Đã Đạt Mức Tối Đa Theo Lớp Học Phần:
+
+CREATE FUNCTION dbo.CheckSoLuongSVDaDatToiDaTheoLHP (
+    @maLHP CHAR(15)
+)
+RETURNS NVARCHAR(50)
+AS
+BEGIN
+    DECLARE @soLuongDK INT
+    DECLARE @soLuongDDK INT
+    SELECT @soLuongDK = soLuongDK, @soLuongDDK = soLuongDDK
+	FROM LopHocPhan WHERE maLHP = @maLHP
+    DECLARE @ketQua NVARCHAR(50)
+    IF @soLuongDDK >= @soLuongDK
+        SET @ketQua = N'Đã đạt số lượng đăng ký tối đa'
+    ELSE
+        SET @ketQua = N'Chưa đạt số lượng đăng ký tối đa'
+
+    RETURN @ketQua
+END;
+-- check
+SELECT * , dbo.CheckSoLuongSVDaDatToiDaTheoLHP(LHP.maLHP) as KetQuaDK
+FROM dbo.LopHocPhan as LHP
+
+
+-- Kiểm tra xem LHP đã có giáo viên dạy hay chưa 
+CREATE FUNCTION dbo.CheckLHPDaCoGiaoVien (
+    @maLHP CHAR(15)
+)
+RETURNS NVARCHAR(50)
+AS
+BEGIN
+    DECLARE @ketQua NVARCHAR(50)
+
+    IF EXISTS (SELECT 1 FROM LopHocPhan WHERE maLHP = @maLHP AND maGV IS NOT NULL)
+        SET @ketQua = N'Lớp học phần đã có giáo viên dạy'
+    ELSE
+        SET @ketQua = N'Lớp học phần chưa có giáo viên dạy'
+
+    RETURN @ketQua
+END;
+
+SELECT LHP.maLHP, dbo.CheckLHPDaCoGiaoVien(LHP.maLHP) AS TinhTrangGiaoVien
+FROM dbo.LopHocPhan as LHP 
+
+
+
+-- PROCEDURE
+-- Câu 1 tạo procedure lấy tên khoa theo mã khoa truyền vào 
+
+CREATE PROCEDURE dbo.Pro_GetTenKhoa
+    @maKhoa CHAR(10)
+AS
+BEGIN
+    SELECT k.maKhoa, dbo.GetTenKhoa(k.maKhoa) as tenKhoa 
+    FROM dbo.Khoa AS k
+    WHERE k.maKhoa = @maKhoa
+END;
+
+-- check câu 1
+EXEC dbo.Pro_GetTenKhoa 'KHOA001';
+
+
+-- Câu 2: Tạo PROCEDURE kiểm tra số lượng đăng ki đã đạt mức tối đa theo lớp học phần 
+CREATE PROCEDURE dbo.Pro_CheckSoLuongSVDaDatToiDaTheoLHP
+    @maLHP CHAR(15)
+AS
+BEGIN
+    SELECT lhp.*, dbo.CheckSoLuongSVDaDatToiDaTheoLHP(lhp.maLHP) as KetQuaDK
+    FROM dbo.LopHocPhan AS lhp
+    WHERE lhp.maLHP = @maLHP
+END;
+
+exec dbo.Pro_CheckSoLuongSVDaDatToiDaTheoLHP 'LHP001'
+
+-- Câu 3 Lấy lớp sinh hoạt của sinh viên dựa vào mã sinh viên truyền vào 
+CREATE PROCEDURE dbo.GetTenLopSHProcedure
+    @maSV CHAR(15)
+AS
+BEGIN
+    SELECT s.*, dbo.GetTenLopSH(s.maSV) as tenLSH
+    FROM dbo.SinhVien AS s
+    WHERE s.maSV = @maSV
+END;
+
+-- Câu 4 Tạo PROCEDURE lấy tên giáo viên thông qua maGiaoVien
+CREATE PROCEDURE dbo.GetTenGiaoVienProcedure
+    @maGV CHAR(15)
+AS
+BEGIN
+    SELECT gv.*, dbo.GetTenGiaoVien(gv.maGV) as tenGV
+    FROM dbo.GiaoVien AS gv
+    WHERE gv.maGV = @maGV
+END;
+
+
+-- Câu 5: Lấy số lượng học phần mà sinh viên đã đăng kí 
+CREATE PROCEDURE dbo.GetSoLuongDangKyProcedure
+    @maSV CHAR(15)
+AS
+BEGIN
+    SELECT s.*, dbo.GetSoLuongDangKy(s.maSV) as SoLuongDK
+    FROM dbo.SinhVien s
+    WHERE s.maSV = @maSV
+END;
+
+-- Thủ tục phần 2: 
+
+-- Lấy tất cả sinh viên trong một lớp cụ thể
+CREATE PROCEDURE pro_LaySinhVienTrongLop
+    @maLop CHAR(10)
+AS
+BEGIN
+    SELECT *
+    FROM SinhVien
+    WHERE maLSH = @maLop;
+END;
+
+exec dbo.pro_LaySinhVienTrongLop 'LSH001'
+--  Lấy tất cả lớp trong một chương trình cụ thể
+CREATE PROCEDURE pro_LayLopTrongChuongTrinh
+    @maChuongTrinh CHAR(20)
+AS
+BEGIN
+    SELECT *
+    FROM LopSH
+    WHERE maKhoa = @maChuongTrinh;
+END;
+exec dbo.pro_LaySinhVienTrongLop 'LSH001'
+--  Lấy lịch học của một sinh viên cụ thể
+CREATE PROCEDURE pro_LayLichHocSinhVien
+    @maSinhVien CHAR(15)
+AS
+BEGIN
+    SELECT LopHocPhan.*, ThoiGian.Thu, ThoiGian.tietBD, ThoiGian.tietKT, Phong.tenPhong
+    FROM LopHocPhan
+    INNER JOIN ThoiGian_PhongHoc ON LopHocPhan.maTG_PH = ThoiGian_PhongHoc.maTG_PH
+    INNER JOIN ThoiGian ON ThoiGian_PhongHoc.maThoiGian = ThoiGian.maThoiGian
+    INNER JOIN Phong ON ThoiGian_PhongHoc.maPhong = Phong.maPhong
+    WHERE EXISTS (
+        SELECT 1
+        FROM DangKiChiTiet
+        WHERE DangKiChiTiet.maLHP = LopHocPhan.maLHP
+              AND DangKiChiTiet.maDK = @maSinhVien
+    );
+END;
+select * from SinhVien
+exec pro_LayLichHocSinhVien 'SV002'
+-- . Cập nhật thông tin sinh viên
+CREATE PROCEDURE pro_CapNhatThongTinSinhVien
+    @maSinhVien CHAR(15),
+    @diaChiMoi NVARCHAR(255),
+    @emailMoi VARCHAR(100),
+    @soDienThoaiMoi CHAR(10)
+AS
+BEGIN
+    UPDATE SinhVien
+    SET diaChi = @diaChiMoi,
+        email = @emailMoi,
+        SDT = @soDienThoaiMoi
+    WHERE maSV = @maSinhVien;
+END;
+
+--  Lấy chi tiết lớp học cho một mã lớp học cụ thể
+CREATE PROCEDURE LayChiTietLopHoc
+    @maLHP CHAR(15)
+AS
+BEGIN
+    SELECT *
+    FROM LopHocPhan
+    WHERE maLHP = @maLHP;
+END;
+
+-- 7. Lấy chi tiết chương trình đào tạo cho một mã chương trình cụ thể
+CREATE PROCEDURE LayChiTietChuongTrinhDaoTao
+    @maChuongTrinh CHAR(20)
+AS
+BEGIN
+    SELECT *
+    FROM ChuongTrinhDaoTao
+    WHERE maChuongTrinhDaoTao = @maChuongTrinh;
+END;
 
 
 
