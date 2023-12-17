@@ -179,7 +179,19 @@ ALTER TABLE ThoiGian
 ALTER TABLE LopSH
     ADD CONSTRAINT CK_LopSH_namBD
 		    CHECK(namBD<getDate());
+ALTER TABLE DangKiChiTiet
+DROP CONSTRAINT [FK__DangKiChiT__maDK__5AEE82B9];
 
+ALTER TABLE DangKiChiTiet
+ALTER COLUMN maLHP char(15) not null 
+
+ALTER TABLE DangKiChiTiet
+ALTER COLUMN maDK char(15) not null 
+-- khóa chính là hai cột maDKCT và maDK
+ALTER TABLE DangKiChiTiet
+DROP CONSTRAINT [PK__DangKiCh__361DBC101107CFE1];
+ALTER TABLE DangKiChiTiet
+ADD CONSTRAINT PK_DangKiChiTiet PRIMARY KEY (maDKCT, maDK);
 -- INSERT DỮ LIỆU 
 
 -- Insert data into Khoa
@@ -1278,6 +1290,94 @@ BEGIN
     FROM ChuongTrinhDaoTao
     WHERE maChuongTrinhDaoTao = @maChuongTrinh;
 END;
+--8 Procedure  Lấy danh sách môn học sinh viên đã đăng kí theo maSV và maHocKi
+CREATE PROCEDURE LayDanhSachHocPhanSinhVienDK
+    @maSV CHAR(15),
+    @maHocKi CHAR(5)
+AS
+BEGIN
+    SELECT
+        dkc.maDKCT,
+        lh.maLHP,
+        hp.tenHP,
+        lh.maHocKi,
+        tg.Thu,
+        tg.tietBD,
+        tg.tietKT
+    FROM
+        DangKiChiTiet dkc
+        INNER JOIN LopHocPhan lh ON dkc.maLHP = lh.maLHP
+        INNER JOIN HocPhan hp ON lh.maHP = hp.maHP
+        INNER JOIN ThoiGian tg ON lh.maTG_PH = tg.maThoiGian
+		INNER JOIN DangKiTinChi dktc ON dktc.maDK = dkc.maDK
+    WHERE
+        dktc.maSV = @maSV
+        AND lh.maHocKi = @maHocKi;
+END;
 
+-- TRIGGER 
+--Câu 1:
+/*
+-	Khi có một sinh viên đăng kí một lớp học phần thì số lượng ĐK giảm xuống 1 và số lượng DDK thì phải tăng lên 1. 
+-	Trường hợp khi một sinh viên xóa lớp học phần thì thực hiện tăng số lượng ĐK lên 1 và số lượng DDK giảm xuống 1 
+-	Trường hợp khi một sinh viên đăng kí hai lớp học phần có thời gian học trùng nhau thì phải rollback về vị trí chọn lại 
 
+*/
+CREATE TRIGGER trig_LHP
+ON [dbo].[DangKiChiTiet]
+AFTER  INSERT, DELETE, UPDATE 
+AS
+BEGIN 
+	if not exists (select * from deleted)
+		-- INSERT data
+	BEGIN
+		IF EXISTS (
+        SELECT 1
+        FROM inserted i
+        JOIN LopHocPhan l ON i.maLHP = l.maLHP
+        WHERE l.soLuongDDK + 1 > l.soLuongDK)
+			BEGIN
+				print N'Số lượng học sinh đăng ký không thể vượt quá số lượng đăng ký cho phép!'
+				ROLLBACK;
+			END
 
+			UPDATE LopHocPhan
+			SET soLuongDDK = l.soLuongDDK + 1
+			FROM inserted i, LopHocPhan l
+			WHERE i.maLHP = l.maLHP
+	END;
+	if not exists (select * from inserted) 
+		BEGIN 
+			-- DELETE data
+			UPDATE LopHocPhan
+			SET soLuongDDK = l.soLuongDDK - 1
+			FROM deleted d, LopHocPhan l
+			WHERE d.maLHP = l.maLHP
+		END;
+END;
+
+select *from dbo.LopHocPhan where maLHP ='LHP003'
+
+select *from dbo.DangKiChiTiet
+insert into dbo.DangKiChiTiet 
+Values ('DKCT007', 'LHP003','DK004')
+delete from dbo.DangKiChiTiet 
+where maDK ='DK004' and maDKCT='DKCT007'
+
+-- tạo trigger 
+CREATE TRIGGER trig_AfterInsert_SinhVien
+ON SinhVien
+AFTER INSERT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Thêm trường mới (ví dụ: truongMoi) với giá trị mặc định
+    ALTER TABLE SinhVien ADD truongMoi INT DEFAULT 0;
+
+    -- Cập nhật trường mới với giá trị tùy thuộc vào điều kiện nào đó
+    UPDATE sv
+    SET truongMoi = CASE WHEN i.someCondition THEN 1 ELSE 0 END
+    FROM SinhVien sv
+    INNER JOIN inserted i ON sv.maSV = i.maSV;
+END;
