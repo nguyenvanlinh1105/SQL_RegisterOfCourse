@@ -164,6 +164,24 @@ ALTER TABLE LopHocPhan
 	ADD CONSTRAINT CK_LopHocPhan_SoLDDK_soLDK
 		CHECK(soLuongDDK<soLuongDK);
 
+ALTER TABLE LopHocPhan
+ALTER COLUMN maHP char(20) NOT NULL
+
+ALTER TABLE LopHocPhan
+ALTER COLUMN soLuongDK int NOT NULL
+
+ALTER TABLE LopHocPhan
+ALTER COLUMN maGV char(15) NOT NULL
+
+ALTER TABLE LopHocPhan
+ALTER COLUMN soLuongDDK int NOT NULL
+
+ALTER TABLE LopHocPhan
+ALTER COLUMN maTG_HP char(15) NOT NULL
+
+ALTER TABLE LopHocPhan
+ALTER COLUMN maHocKi char(5) NOT NULL
+
 ALTER TABLE ThoiGian 
 	ADD CONSTRAINT CK_TGLHP_tietBD
 		CHECK(tietBD>0 and tietBD<15);
@@ -182,6 +200,30 @@ ALTER TABLE LopSH
 ALTER TABLE DangKiChiTiet
 DROP CONSTRAINT [FK__DangKiChiT__maDK__5AEE82B9];
 
+ALTER TABLE DangKiTinChi 
+ALTER COLUMN maSV char(15) NOT NULL
+
+ALTER TABLE GiaoVien 
+ALTER COLUMN tenGV nvarchar(255) NOT NULL
+
+ALTER TABLE GiaoVien 
+ALTER COLUMN email varchar(255) NOT NULL
+
+ALTER TABLE HocPhan 
+ALTER COLUMN tenHP nvarchar(255) NOT NULL
+
+ALTER TABLE HocPhan
+ALTER COLUMN soTC int NOT NULL;
+
+ALTER TABLE ThoiGian_PhongHoc
+ALTER COLUMN maPhong char(10) NOT NULL
+
+ALTER TABLE ThoiGian_PhongHoc
+ALTER COLUMN maThoiGian char(10) NOT NULL
+
+select * from dbo.ThoiGian_PhongHoc
+delete from dbo.ThoiGian_PhongHoc 
+WHERE maTG_PH ='TG_PH006 '      
 ALTER TABLE DangKiChiTiet
 ALTER COLUMN maLHP char(15) not null 
 
@@ -190,6 +232,7 @@ ALTER COLUMN maDK char(15) not null
 -- khóa chính là hai cột maDKCT và maDK
 ALTER TABLE DangKiChiTiet
 DROP CONSTRAINT [PK__DangKiCh__361DBC101107CFE1];
+
 ALTER TABLE DangKiChiTiet
 ADD CONSTRAINT PK_DangKiChiTiet PRIMARY KEY (maDKCT, maDK);
 -- INSERT DỮ LIỆU 
@@ -1314,6 +1357,61 @@ BEGIN
         dktc.maSV = @maSV
         AND lh.maHocKi = @maHocKi;
 END;
+-- 9 Procedure INSERT 1 dòng dữ liệu vao bảng LopHocPhan đảm bảo không trùng khóa chính, thực hiện kiểm tra tính hợp lệ của dữ liệu , đảm bảo toàn vẹn tham chiếu .
+CREATE PROCEDURE sp_ThemLopHocPhan
+    @maLHP CHAR(15),
+    @maHP CHAR(20),
+    @maGV CHAR(15),
+    @soLuongDK INT,
+    @soLuongDDK INT,
+    @maTG_PH CHAR(15),
+    @maHocKi CHAR(5),
+    @ghiChu NVARCHAR(255)
+AS
+BEGIN
+	-- Kiểm tra dữ liệu đầu vào phải đảm bảo không null ở các cột đã xét not null
+	IF @maLHP IS NULL OR @maHP IS NULL OR @maGV IS NULL OR @maTG_PH IS NULL OR @maHocKi IS NULL
+    BEGIN
+        print N'Các tham số không được để trống.';
+        return;
+    END
+
+    -- Kiểm tra khóa chính không trùng
+    IF NOT EXISTS (SELECT 1 FROM LopHocPhan WHERE maLHP = @maLHP)
+    BEGIN
+        -- Kiểm tra khóa ngoại Mã Học Phần
+        IF NOT EXISTS (SELECT 1 FROM HocPhan WHERE maHP = @maHP)
+        BEGIN
+            print N'Mã Học Phần không tồn tại.';
+			return ;
+        END
+
+        -- Kiểm tra khóa ngoại Mã Giáo Viên
+        IF NOT EXISTS (SELECT 1 FROM GiaoVien WHERE maGV = @maGV)
+        BEGIN
+            print N'Mã Giáo Viên không tồn tại.';
+			return ;
+        END
+
+        -- Kiểm tra khóa ngoại Mã Thời Gian - Phòng Học
+        IF NOT EXISTS (SELECT 1 FROM ThoiGian_PhongHoc WHERE maTG_PH = @maTG_PH)
+        BEGIN
+            print N'Mã Thời Gian - Phòng Học không tồn tại.';
+            return;
+        END
+
+        -- Thêm dòng vào bảng LopHocPhan
+        INSERT INTO LopHocPhan (maLHP, maHP, maGV, soLuongDK, soLuongDDK, maTG_PH, maHocKi, ghiChu)
+        VALUES (@maLHP, @maHP, @maGV, @soLuongDK, @soLuongDDK, @maTG_PH, @maHocKi, @ghiChu);
+        
+        PRINT N'Thêm lớp học phần thành công.';
+    END
+    ELSE
+    BEGIN
+        print N'Mã Lớp Học Phần đã tồn tại.';
+        return ;
+    END
+END;
 
 -- TRIGGER 
 --Câu 1:
@@ -1363,7 +1461,9 @@ insert into dbo.DangKiChiTiet
 Values ('DKCT007', 'LHP003','DK004')
 delete from dbo.DangKiChiTiet 
 where maDK ='DK004' and maDKCT='DKCT007'
-
+select  * from dbo.LopHocPhan
+insert into dbo.LopHocPhan 
+values ('LHP07','HP001','GV001'
 -- tạo trigger 
 CREATE TRIGGER trig_AfterInsert_SinhVien
 ON SinhVien
@@ -1380,4 +1480,58 @@ BEGIN
     SET truongMoi = CASE WHEN i.someCondition THEN 1 ELSE 0 END
     FROM SinhVien sv
     INNER JOIN inserted i ON sv.maSV = i.maSV;
+END;
+
+-- trigger thứ 2
+CREATE TRIGGER Trig_LopHocPhan
+ON LopHocPhan
+AFTER DELETE
+AS
+BEGIN
+        DELETE DangKiChiTiet
+        FROM deleted d
+		WHERE DangKiChiTiet.maLHP = d.maLHP
+END;
+
+-- TRigger thứ 3: 
+CREATE TRIGGER trg_AfterInsert_DangKiChiTiet
+ON dbo.DangKiChiTiet
+AFTER INSERT
+AS
+BEGIN
+    -- Kiểm tra xem có hai lớp học phần trùng thời gian học cho một sinh viên hay không
+    IF NOT EXISTS (
+        SELECT 1
+        FROM inserted i
+        JOIN LopHocPhan l ON i.maLHP = l.maLHP
+        JOIN dbo.ThoiGian_PhongHoc tgph ON tgph.maTG_PH = l.maTG_PH
+        JOIN dbo.ThoiGian tg ON tg.maThoiGian = tgph.maThoiGian
+        WHERE EXISTS (
+                SELECT 1
+                FROM DangKiChiTiet dkt
+                JOIN LopHocPhan lh ON dkt.maLHP = lh.maLHP
+                JOIN dbo.ThoiGian_PhongHoc tgphdkt ON tgphdkt.maTG_PH = lh.maTG_PH
+                JOIN dbo.ThoiGian tgdkt ON tgdkt.maThoiGian = tgphdkt.maThoiGian
+                JOIN DangKiTinChi dktc ON dkt.maDK = dktc.maDK
+                WHERE dktc.maSV = ( SELECT maSV From dbo.DangKiTinChi DKTC,
+					DangKiChiTiet DKCT WHERE DKTC.maDK = DKCT.maDK)
+                    AND dkt.maDKCT <> i.maDKCT
+					AND EXISTS(SELECT COUNT(TG.maThoiGian) FROM dbo.DangKiChiTiet DKCT
+							JOIN dbo.LopHocPhan LHP ON DKCT.maLHP = LHP.maHP
+							JOIN dbo.ThoiGian_PhongHoc TG_PH ON LHP.maTG_PH = TG_PH.maThoiGian
+							JOIN dbo.ThoiGian TG ON TG.maThoiGian = TG_PH.maThoiGian
+						GROUP BY DKCT.maDK 
+						HAVING COUNT(TG.maThoiGian) >1)
+            )
+    )
+    BEGIN
+        -- Tất cả các môn học phần không có thời gian trùng nhau, tiến hành insert thêm một Lớp học phần mới 
+        PRINT N'Tất cả các môn học phần không có thời gian trùng nhau';
+    END
+    ELSE
+    BEGIN
+        -- Có ít nhất một môn học phần trùng thời gian
+        PRINT N'Có ít nhất một môn học phần trùng thời gian. Rollback!';
+        ROLLBACK;
+    END;
 END;
