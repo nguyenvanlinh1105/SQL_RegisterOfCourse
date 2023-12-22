@@ -235,6 +235,8 @@ DROP CONSTRAINT [PK__DangKiCh__361DBC101107CFE1];
 
 ALTER TABLE DangKiChiTiet
 ADD CONSTRAINT PK_DangKiChiTiet PRIMARY KEY (maDKCT, maDK);
+
+
 -- INSERT DỮ LIỆU 
 
 -- Insert data into Khoa
@@ -452,7 +454,20 @@ WHERE maLHP NOT IN (SELECT maLHP FROM DangKiChiTiet);
 --i.	Xóa tất cả phòng từ bảng LopHP_Phong mà tên phòng không có tí tự ‘Phòng’
 DELETE FROM Phong
 WHERE tenPhong NOT LIKE '%Phòng%';
+ --j.	Xóa tất cả sinh viên không dăng kí môn học từ kì '123' 
 
+DELETE FROM DangKiChiTiet
+WHERE maDK NOT IN (SELECT maDK FROM DangKiTinChi DKTC
+					JOIN dbo.LopHocPhan LHP ON DKTC.maLHP = LHP.maLHP
+					WHERE maHocKi ='123');
+-- Xóa tất cả đăng ký chi tiết của sinh viên có mã sinh viên là 'MaSinhVienCanXoa'
+DELETE FROM DangKiChiTiet
+WHERE maDK IN (
+    SELECT maDK
+    FROM DangKiTinChi
+    WHERE maSV = 'SV001'
+);
+select *from dbo.SinhVien
 -- SELECT 
 --a.	Hiển thị các lớp thuộc khoa ‘Công nghệ thông tin’
 SELECT tenLSH, maLSH
